@@ -4,17 +4,23 @@
 struct Ball{
     float x = 0, y = 0;
     int radius = 20;
-    int speedX = 7;
-    int speedY = 7;
+    const int defaultSpeed = 7;
+    int speedX = defaultSpeed;
+    int speedY = defaultSpeed;
+    std::string direction;
 };
 struct Paddle{
     float x = 0, y = 0;
     float width = 25;
     float height = 120;
+    float roundness = 0.8;
+    int segment = 0;
     float speed = 6;
+    std::string direction;
 };
 
-void limitMovement(float x, float &y, float height){
+
+void limitMovement(float &y, float height){
     if(y <= 0){
         y = 0;
     }
@@ -22,19 +28,30 @@ void limitMovement(float x, float &y, float height){
         y = GetScreenHeight() - height; 
     }
 }
+
 void resetBall(Ball &ball){
     ball.x = GetScreenWidth()/2;
     ball.y = GetScreenHeight()/2;
+    ball.speedX = ball.defaultSpeed;
+    ball.speedY = ball.defaultSpeed;
     int speedChoices[2] = {-1, 1};
 
     ball.speedX *= speedChoices[GetRandomValue(0, 1)];
     ball.speedY *= speedChoices[GetRandomValue(0, 1)];
 }
+
 void ballUpdate(Ball &ball, int &playerScore, int &cpuScore){
+    const int MAX_SPEED = 15;
     ball.x += ball.speedX;
     ball.y += ball.speedY;
 
-    if(ball.y + ball.radius <= 0 || ball.y + ball.radius >= GetScreenHeight()){
+    if(ball.speedY < 0){
+        ball.direction = "UP";
+    }
+    else if(ball.speedY > 0){
+        ball.direction = "DOWN";
+    }
+
     if(ball.y - ball.radius <= 0 || ball.y + ball.radius >= GetScreenHeight()){
         ball.speedY *= -1;
     }
@@ -46,27 +63,85 @@ void ballUpdate(Ball &ball, int &playerScore, int &cpuScore){
         playerScore++;
         resetBall(ball);
     }
+
+    if(ball.speedX < -MAX_SPEED){
+        ball.speedX = -(MAX_SPEED - 1);
+    }
+    else if(ball.speedY < -MAX_SPEED){
+        ball.speedY = -(MAX_SPEED - 1);
+    }
+    else if(ball.speedX > MAX_SPEED){
+        ball.speedX = MAX_SPEED - 1; 
+    }
+    else if(ball.speedY > MAX_SPEED){
+        ball.speedY = MAX_SPEED - 1; 
+    }
+    else if(ball.speedX == 0){
+        ball.speedX = ball.defaultSpeed;
+    }
+    else if(ball.speedY == 0){
+        ball.speedY = ball.defaultSpeed;
+    }
 }
-void playerUpdate(Paddle &player){
+
+void playerUpdate(Paddle &player){ 
     if(IsKeyDown(KEY_UP)){
         player.y -= player.speed;
+        player.direction = "UP";
     }
     else if(IsKeyDown(KEY_DOWN)){
         player.y += player.speed;
+        player.direction = "DOWN";
     }
 
-    limitMovement(player.x, player.y, player.height);
+    limitMovement(player.y, player.height);
 }
+
 void cpuUpdate(Paddle &cpu, Ball &ball){  //cpu = opponent ai, not actual cpu
     if(cpu.y + cpu.height/2 > ball.y){
         cpu.y -= cpu.speed;
+        cpu.direction = "UP";
     }
     else if(cpu.y + cpu.height/2 <= ball.y){
         cpu.y += cpu.speed;
-    }
+        cpu.direction = "DOWN";
+    } 
 
-    limitMovement(cpu.x, cpu.y, cpu.height);
+    limitMovement(cpu.y, cpu.height);
 }
+
+void ballPaddleCollision(Paddle paddle, Ball &ball){
+    const float SPEEDx_MULTIPLIER = 1.3;
+    const float SPEEDx_DEMULTIPLIER = 0.8;
+    const float SPEEDy_MULTIPLIER = 1.2;
+    const float SPEEDy_DEMULTIPLIER = 0.9;
+
+    if(CheckCollisionCircleRec(Vector2{ball.x, ball.y}, ball.radius, Rectangle{paddle.x, paddle.y, paddle.width, paddle.height})){
+        if(ball.direction == paddle.direction){
+            ball.speedX = SPEEDx_MULTIPLIER * -ball.speedX;
+            ball.speedY = SPEEDy_MULTIPLIER * ball.speedY;
+        }
+        else if(ball.direction == "UP" && paddle.direction == "DOWN"){
+            ball.speedX = SPEEDx_DEMULTIPLIER * -ball.speedX;
+            ball.speedY = SPEEDy_DEMULTIPLIER * ball.speedY;
+        }
+        else if(ball.direction == "DOWN" && paddle.direction == "UP"){
+            ball.speedX = SPEEDx_DEMULTIPLIER * -ball.speedX;
+            ball.speedY = SPEEDy_DEMULTIPLIER * ball.speedY;
+        }
+        else{
+            ball.speedX = -ball.speedX;
+            ball.speedY = ball.speedY;
+        }
+
+        if (ball.speedX > 0) {
+            ball.x = paddle.x + paddle.width + ball.radius;
+        } else {
+            ball.x = paddle.x - ball.radius;
+        }
+    } 
+}
+
 
 int main(){
     std::cout << "GAME: Initializing...\n";
@@ -89,37 +164,47 @@ int main(){
     Paddle cpu; 
     cpu.x = 10;
     cpu.y = screenHeight/2 - cpu.height/2;
-    std::cout << "GAME: CPU setup complete\n\n"; //two new lines for cleaner output
-
+    std::cout << "GAME: CPU setup complete\n"; 
+                                                 
+    Color green = Color{38, 185, 154, 255};
+    Color darkGreen = Color{20, 160, 133, 255};
+    Color lightGreen = Color{129, 204, 184, 255};
+    Color yellow = Color{243, 213, 91, 255};
+    std::cout << "GAME: Color setup complete\n\n"; //two new lines for cleaner output
+ 
     InitWindow(screenWidth, screenHeight, "Pong");
     SetTargetFPS(60);
-
     std::cout << "\nGAME: Starting the game...\n"; //new line before for cleaner output
+
+    //game loop
     while(WindowShouldClose() == false){
         BeginDrawing();
-        ClearBackground(BLACK);
+        ClearBackground(darkGreen); 
 
+        //update
         ballUpdate(ball, playerScore, cpuScore);
         playerUpdate(player);
         cpuUpdate(cpu, ball);
+        //std::cout << ball.direction << ", " << player.direction << ", " << cpu.direction << '\n';
+        std::cout << ball.speedX << ", " << ball.speedY << '\n';
 
-        if(CheckCollisionCircleRec(Vector2{ball.x, ball.y}, ball.radius, Rectangle{player.x, player.y, player.width, player.height})){
-            ball.speedX = -abs(ball.speedX);
-        }
-        else if(CheckCollisionCircleRec(Vector2{ball.x, ball.y}, ball.radius, Rectangle{cpu.x, cpu.y, cpu.width, cpu.height})){
-            ball.speedX = abs(ball.speedX);
-        }
+        ballPaddleCollision(player, ball);
+        ballPaddleCollision(cpu, ball);
 
+        //draw
+        DrawRectangle(screenWidth/2, 0, screenWidth/2, screenHeight, green);
+        DrawCircle(screenWidth/2, screenHeight/2, 150, lightGreen);
         DrawLine(screenWidth/2, 0, screenWidth/2, screenHeight, WHITE);
-        DrawCircle(ball.x, ball.y, ball.radius, WHITE);
-        DrawRectangle(player.x, player.y, player.width, player.height, WHITE);
-        DrawRectangle(cpu.x, cpu.y, cpu.width, cpu.height, WHITE);
+        DrawCircle(ball.x, ball.y, ball.radius, yellow);
+        DrawRectangleRounded(Rectangle{player.x, player.y, player.width, player.height}, player.roundness, player.segment, WHITE);
+        DrawRectangleRounded(Rectangle{cpu.x, cpu.y, cpu.width, cpu.height}, cpu.roundness, cpu.segment, WHITE);
         DrawText(TextFormat("%i", cpuScore), screenWidth/4 - 20, 20, 80, WHITE);
         DrawText(TextFormat("%i", playerScore), 3 * screenWidth/4 - 20, 20, 80, WHITE);
-
+        
         EndDrawing();
     }
-
+    
     std::cout << "GAME: Closing the game...\n\n";
     CloseWindow();
     return 0;
+}
