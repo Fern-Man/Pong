@@ -97,7 +97,7 @@ void playerUpdate(Paddle &player){
     limitMovement(player.y, player.height);
 }
 
-void cpuUpdate(Paddle &cpu, Ball &ball){  //cpu = opponent ai, not actual cpu
+void cpuUpdate(Paddle &cpu, const Ball &ball){  //cpu = opponent ai, not actual cpu
     if(cpu.y + cpu.height/2 > ball.y){
         cpu.y -= cpu.speed;
         cpu.direction = "UP";
@@ -110,14 +110,13 @@ void cpuUpdate(Paddle &cpu, Ball &ball){  //cpu = opponent ai, not actual cpu
     limitMovement(cpu.y, cpu.height);
 }
 
-void ballPaddleCollision(Paddle paddle, Ball &ball){
+void spinTech(const Paddle &paddle, Ball &ball){
     const float SPEEDx_MULTIPLIER = 1.3;
     const float SPEEDx_DEMULTIPLIER = 0.8;
     const float SPEEDy_MULTIPLIER = 1.2;
     const float SPEEDy_DEMULTIPLIER = 0.9;
 
-    if(CheckCollisionCircleRec(Vector2{ball.x, ball.y}, ball.radius, Rectangle{paddle.x, paddle.y, paddle.width, paddle.height})){
-        if(ball.direction == paddle.direction){
+    if(ball.direction == paddle.direction){
             ball.speedX = SPEEDx_MULTIPLIER * -ball.speedX;
             ball.speedY = SPEEDy_MULTIPLIER * ball.speedY;
         }
@@ -133,10 +132,16 @@ void ballPaddleCollision(Paddle paddle, Ball &ball){
             ball.speedX = -ball.speedX;
             ball.speedY = ball.speedY;
         }
+}
+
+void ballPaddleCollision(const Paddle &paddle, Ball &ball){
+    if(CheckCollisionCircleRec(Vector2{ball.x, ball.y}, ball.radius, Rectangle{paddle.x, paddle.y, paddle.width, paddle.height})){
+        spinTech(paddle, ball);
 
         if (ball.speedX > 0) {
             ball.x = paddle.x + paddle.width + ball.radius;
-        } else {
+        } 
+        else{
             ball.x = paddle.x - ball.radius;
         }
     } 
